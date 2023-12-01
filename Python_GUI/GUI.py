@@ -1,155 +1,211 @@
-# python program demonstrating 
-# Combobox widget using tkinter 
-
-#mport serial
-import tkinter as tk 
+"""
+IF Receiver GUI
+Author: Deepak Kumar Panda
+Copyright (c) 2023 Your Name. All rights reserved.
+"""
+import tkinter as tk
 from tkinter import ttk
 import serial.tools.list_ports
+import logging
 
 
-# Creating tkinter window 
-window = tk.Tk()
-#logo = tk.PhotoImage(file="logo4.PNG")
-#window.configure(bg='#87BECC')
-window.title('KALYANI CENTER OF TECHNOLOGY AND INOVATION') 
-window.geometry('580x380')
+class SerialHandler:
+    def __init__(self):
+        self.ser = None
 
-#functions
-def hello():
-    A=a.get()
-    print("Data is")
-    print(A)
-    if A == '\0':
-        A='0'
-    B=b.get()
-    if B==0X00:
-        B='0'
-    C=c.get()
-    if C==0X00 :
-        C='0'
-    D=d.get()
-    if D==0X00 :
-        D='0'
-    E=e.get()
-    if E==0X00 :
-        A='0'
-    F=f.get()
-    if F==0X00 :
-        F='0'
-    ttk.Label(window, text = '$'+','+A+','+B+','+C+','+D+','+E+','+F+','+'#',font = ("Robot", 10)).grid(column = 3, row = 10,columnspan=2,rowspan=2,sticky='W', padx = 10, pady = 25)
-    #ser.write(b'$'+','+A+','+B+','+C+','+D+','+E+','+F+','+'#') 
+    def open_port(self, port):
+        try:
+            self.ser = serial.Serial(port, baudrate=9600, timeout=1)
+            logging.info(f"Serial port {port} opened successfully.")
+            return True
+        except serial.SerialException as e:
+            if isinstance(e.__cause__, PermissionError):
+                logging.error(f"Permission error: Make sure you have the necessary permissions to access {port}.")
+            else:
+                logging.error(f"Error opening serial port: {e}")
+            return False
 
-def sel_usb():
-    G=g.get()
-    ttk.Label(window, text = "Connected to " + G + ' ' ,font = ("Robot", 10)).grid(column = 3, row = 11,columnspan=2,rowspan=2,sticky='W', padx = 10, pady = 25)
-    
-
-# label text for title
-
-ttk.Label(window, text = "IF RECEIVER GUI",foreground ="black", font = ("Ubuntu Medium", 20)).grid(column = 1,row = 0, columnspan=2,sticky = 'N' ,padx = 0, pady = 30)
-                             
-#ttk.Label(window,image=logo).grid(column = 0,row = 0,sticky='E', padx = 0, pady = 10)
-                             
-                             
-                             
-# label
-#labelframe = LabelFrame(window, text="This is a LabelFrame").grid(column = 0, 
-#		row = 0, padx = 10, pady = 25)
-#labelframe.pack(fill="both", expand="yes")
- 
-#left = Label(labelframe, text="Inside the LabelFrame")
-
-ttk.Label(window, text = "ATTENUATOR 1 (dB):",
-		font = ("Robot", 10)).grid(column = 0, 
-		row = 6, padx = 10, pady = 25)
-
-ttk.Label(window, text = "ATTENUATOR 2 (dB):",
-		font = ("Robot", 10)).grid(column = 0, 
-		row = 7, padx = 10, pady = 25)
-
-ttk.Label(window, text = "ATTENUATOR 3 (dB):",
-		font = ("Robot", 10)).grid(column = 0, 
-		row = 8, padx = 10, pady = 25)
+    def close_port(self):
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+            logging.info("Serial port closed.")
+        else:
+            logging.info("No open serial port to close.")
 
 
+class IFReceiverGUI:
+    def __init__(self, root, serial_handler):
+        self.root = root
+        self.serial_handler = serial_handler
+        self.ser = None
+        self.root.title('IF RECEIVER GUI')
+        self.root.geometry('320x450')
+        self.connected = False  # Flag to track the connection status
 
-ttk.Label(window, text = "PHASE SHIFTER 1 (V):",
-		font = ("Robot", 10)).grid(column = 2, 
-		row = 6, padx = 10, pady = 25)
+        self.create_title_label()
+        self.create_widgets()
 
-ttk.Label(window, text = "PHASE SHIFTER 2 (V):",
-		font = ("Robot", 10)).grid(column = 2, 
-		row = 7, padx = 10, pady = 25)
+    def create_title_label(self):
+        title_label = ttk.Label(self.root, text="IF RECEIVER GUI", font=("Helvetica", 24, "bold"), foreground="blue")
+        title_label.grid(column=0, row=0, columnspan=3, sticky='N', padx=0, pady=30)
+        title_label.configure(style='Title.TLabel')  # Set background color for the title label
 
-ttk.Label(window, text = "PHASE SHIFTER 3 (V):",
-		font = ("Robot", 10)).grid(column = 2, 
-		row = 8, padx = 10, pady = 25)
+    def create_widgets(self):
+        self.create_serial_frame()
+        self.create_attenuator_box()
+        self.create_phase_shifter_box()
+        self.create_sent_text_box()
+        self.create_buttons()
 
-# Combobox creation 
-a= tk.StringVar()
-A1 = ttk.Combobox(window, width = 15, textvariable = a)
+        # Disable phase shifter and attenuator comboboxes by default
+        for i in range(3):
+            self.phase_shifter_comboboxes[i]['state'] = 'disabled'
+            self.attenuator_comboboxes[i]['state'] = 'disabled'
 
-b= tk.StringVar()
-A2 = ttk.Combobox(window, width = 15, textvariable = b)
+        # Disable send button by default
+        self.send_button['state'] = 'disabled'
 
-c = tk.StringVar()
-A3 = ttk.Combobox(window, width = 15, textvariable = c)
+    def create_serial_frame(self):
+        serial_frame = ttk.LabelFrame(self.root, text="Serial Communication")
+        serial_frame.grid(column=0, row=1, columnspan=3, pady=10, padx=10, sticky='WE')
+        serial_frame.configure(style='BW.TLabelframe')  # Set background color for the serial frame
 
+        self.port_combobox = ttk.Combobox(serial_frame, text="COM", width=10)
+        self.port_combobox.grid(column=0, row=0, padx=10, pady=5, sticky='W')
 
+        self.refresh_button = ttk.Button(serial_frame, text="Refresh", command=self.refresh_ports, state='normal')
+        self.refresh_button.grid(column=1, row=0, padx=10, pady=5)
 
-d = tk.StringVar()
-PS1 = ttk.Combobox(window, width = 15, textvariable = d)
+        self.connect_button = ttk.Button(serial_frame, text="Connect", command=self.toggle_connect, state='normal')
+        self.connect_button.grid(column=2, row=0, padx=10, pady=5)
 
-e = tk.StringVar()
-PS2 = ttk.Combobox(window, width = 15, textvariable = e)
+    def create_attenuator_box(self):
+        attenuator_box = ttk.LabelFrame(self.root, text="Attenuators (dB)")
+        attenuator_box.grid(column=0, row=2, columnspan=3, padx=10, pady=10, sticky='WE')
 
-f = tk.StringVar()
-PS3 = ttk.Combobox(window, width = 15, textvariable = f)
+        self.attenuator_comboboxes = []
+        for i in range(3):
+            attenuator_combobox = ttk.Combobox(attenuator_box, width=10)
+            attenuator_combobox.grid(column=i, row=0, pady=10)
+            attenuator_combobox['values'] = [str(j * 0.5) for j in range(61)]
+            self.attenuator_comboboxes.append(attenuator_combobox)
 
+    def create_phase_shifter_box(self):
+        phase_shifter_box = ttk.LabelFrame(self.root, text="Phase Shifters (V)")
+        phase_shifter_box.grid(column=0, row=3, columnspan=3, padx=10, pady=10, sticky='WE')
 
-g= tk.StringVar()
-port = ttk.Combobox(window,text="COM", width = 15, textvariable = g)
+        self.phase_shifter_comboboxes = []
+        for i in range(1, 4):
+            phase_shifter_combobox = ttk.Combobox(phase_shifter_box, width=10)
+            phase_shifter_combobox.grid(column=i, row=0, pady=10)
+            phase_shifter_combobox['values'] = [str(j * 0.5) for j in range(31)]
+            self.phase_shifter_comboboxes.append(phase_shifter_combobox)
 
+    def create_sent_text_box(self):
+        sent_text_box = ttk.LabelFrame(self.root, text="Sent Text")
+        sent_text_box.grid(column=0, row=4, columnspan=3, padx=10, pady=10, sticky='WE')
 
-SEND = ttk.Button(window, text ="Send", command = hello)
-connect = ttk.Button(window, text ="Connect", command = sel_usb)
+        self.sent_label = ttk.Label(sent_text_box, text="", font=("Robot", 10))
+        self.sent_label.grid(column=0, row=0, pady=10)
 
+    def create_buttons(self):
+        self.send_button = ttk.Button(self.root, text="Send", command=self.send_data)
+        self.send_button.grid(column=1, row=5, pady=10)
 
-# Adding combobox drop down list 
-PS1['values'] = ('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0')
-PS2['values'] = ('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0')
-PS3['values'] = ('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0')
+    def close_serial_port(self):
+        if self.ser and self.ser.is_open:
+            self.ser.close()
+            logging.info("Serial port closed.")
+        else:
+            logging.warning("No open serial port to close.")
+        self.connected = False
 
-A1['values']=('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0','15.5','16.0','16.5','17.0','17.5','18.0','18.5','19.0','19.5','20.0','20.5','21.0','21.5','22.0','22.5','23.0','23.5','24.0','24.5','25.0','25.5','26.0','26.5','27.0','27.5','28.0','28.5','29.0','29.5','30.0','30.5','31.0'
-)
-A2['values']=('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0','15.5','16.0','16.5','17.0','17.5','18.0','18.5','19.0','19.5','20.0','20.5','21.0','21.5','22.0','22.5','23.0','23.5','24.0','24.5','25.0','25.5','26.0','26.5','27.0','27.5','28.0','28.5','29.0','29.5','30.0','30.5','31.0'
-)
-A3['values']=('0','0.5','1.0','1.5','2.0','2.5','3.0','3.5','4.0','4.5','5.0','5.5','6.0','6.5','7.0','7.5','8.0','8.5','9.0','9.5','10.0','10.5','11.0','11.5','12.0','12.5','13.0','13.5','14.0','14.5','15.0','15.5','16.0','16.5','17.0','17.5','18.0','18.5','19.0','19.5','20.0','20.5','21.0','21.5','22.0','22.5','23.0','23.5','24.0','24.5','25.0','25.5','26.0','26.5','27.0','27.5','28.0','28.5','29.0','29.5','30.0','30.5','31.0'
-)
+        # Enable widgets when disconnected
+        self.port_combobox['state'] = 'normal'
+        self.connect_button['state'] = 'normal'
+        self.refresh_button['state'] = 'normal'
+        self.send_button['state'] = 'disable'
+        for i in range(3):
+            self.phase_shifter_comboboxes[i]['state'] = 'disabled'
+            self.attenuator_comboboxes[i]['state'] = 'disabled'
+        # Reset connection-related labels
+        ttk.Label(self.root, text="", font=("Robot", 10)).grid(column=3, row=11, columnspan=2, rowspan=2, sticky='W',
+                                                               padx=10, pady=25)
+        # Update the button text to "Connect"
+        self.connect_button.configure(text="Connect")
 
-#p['values'] = ( 'COM0','COM1','COM2','COM3')
-port ['values'] = serial.tools.list_ports.comports()
+    def open_serial_port(self, port):
+        try:
+            self.ser = serial.Serial(port, baudrate=9600, timeout=1)
+            logging.info(f"Serial port {port} opened successfully.")
+            return True
+        except serial.SerialException as e:
+            if isinstance(e.__cause__, PermissionError):
+                logging.error(f"Permission error: Make sure you have the necessary permissions to access {port}.")
+            else:
+                logging.error(f"Error opening serial port: {e}")
+            return False
 
-A1.grid(column = 1, row = 6)
-A2.grid(column = 1, row = 7)
-A3.grid(column = 1, row = 8)
+    def refresh_ports(self):
+        ttk.Label(self.root, text="Refreshing serial ports...", font=("Robot", 10)).grid(column=3, row=1, columnspan=2,
+                                                                                         rowspan=2, sticky='W', padx=10,
+                                                                                         pady=25)
+        self.root.update_idletasks()  # Force update to show the label
+        self.port_combobox['values'] = [comport.device for comport in serial.tools.list_ports.comports()]
+        logging.info("Serial ports refreshed.")
+        ttk.Label(self.root, text="", font=("Robot", 10)).grid(column=3, row=1, columnspan=2, rowspan=2, sticky='W',
+                                                               padx=10, pady=25)  # Clear the label
 
-PS1.grid(column = 3, row = 6)
-PS2.grid(column = 3, row = 7)
-PS3.grid(column = 3, row = 8)
+    def toggle_connect(self):
+        if not self.connected:
+            selected_port = self.port_combobox.get()
+            if selected_port:
+                if self.open_serial_port(selected_port):
+                    ttk.Label(self.root, text="Connected to " + selected_port, font=("Robot", 10)).grid(column=3,
+                                                                                                        row=11,
+                                                                                                        columnspan=2,
+                                                                                                        rowspan=2,
+                                                                                                        sticky='W',
+                                                                                                        padx=10,
+                                                                                                        pady=25)
+                    # Disable widgets when connected
+                    self.port_combobox['state'] = 'disabled'
+                    self.refresh_button['state'] = 'disabled'
+                    self.send_button['state'] = 'enable'
+                    for i in range(3):
+                        self.phase_shifter_comboboxes[i]['state'] = 'enable'
+                        self.attenuator_comboboxes[i]['state'] = 'enable'
+                    self.connected = True
+                    # Update the button text to "Disconnect"
+                    self.connect_button.configure(text="Disconnect")
+                else:
+                    print(f"Failed to connect to {selected_port}")
+        else:
+            # Disconnect and release the serial port
+            self.close_serial_port()
 
-port.grid(column = 0, row = 10)
+    def send_data(self):
 
-SEND.grid(column = 2, row = 10,)
-connect.grid(column = 1, row = 10)
+        attenuator_values = [combobox.get() or '0' for combobox in self.attenuator_comboboxes]
+        phase_shifter_values = [combobox.get() or '0' for combobox in self.phase_shifter_comboboxes]
 
-A1.current()
-A2.current()
-A3.current()
+        data = f"${','.join(attenuator_values + phase_shifter_values)}#"
+        logging.info(f"Sending data: {data}")
 
-PS1.current()
-PS2.current()
-PS3.current()
+        self.sent_label.configure(text=data)
+        self.ser.write(data.encode())
 
-#SEND.pack()
-window.mainloop() 
+        logging.info("Data sent over serial.")
+
+if __name__ == "__main__":
+    style = ttk.Style()
+    style.configure('Title.TLabel', background='#D3D3D3')  # Set background color for the title label
+    style.configure('BW.TLabelframe', background='#D3D3D3')  # Set background color for the serial frame
+
+    logging.basicConfig(level=logging.DEBUG)  # Set the desired logging level
+
+    serial_handler = SerialHandler()
+
+    root = tk.Tk()
+    app = IFReceiverGUI(root, serial_handler)
+    root.mainloop()
